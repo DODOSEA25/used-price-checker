@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>중고 시세 검색기</title>
+  <style>
+    body {
+      font-family: 'Arial', sans-serif;
+      text-align: center;
+      padding: 2em;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 300px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 10px;
+    }
+    .result {
+      margin-top: 2em;
+      text-align: left;
+      max-width: 600px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .site-block {
+      border: 1px solid #ccc;
+      padding: 1em;
+      margin-top: 1em;
+      border-radius: 5px;
+    }
+  </style>
+</head>
+<body>
+  <h1>중고 시세 검색기</h1>
+  <p>내가 팔거나 사고 싶은 제품의 중고 시세가 얼마일까?</p>
+  <input id="searchInput" type="text" placeholder="예: LG 오브제 냉장고" />
+  <button onclick="searchPrice()">검색</button>
+
+  <div id="result" class="result"></div>
+
+  <script>
+    function searchPrice() {
+      const query = document.getElementById('searchInput').value;
+      const resultDiv = document.getElementById('result');
+
+      if (!query.trim()) {
+        resultDiv.innerHTML = '<p>검색어를 입력해주세요.</p>';
+        return;
+      }
+
+      // 실제로는 서버에서 크롤링해야 하지만, 일단 더미 데이터로 대체
+      const dummyPrices = [990000, 1200000, 1150000, 1100000];
+      const avg = Math.floor(dummyPrices.reduce((a, b) => a + b, 0) / dummyPrices.length);
+
+      const tags = ['#1년사용', '#생활기스', '#미개봉'];
+      const siteData = {
+        '번개장터': ['LG 오브제 냉장고 99만원', '미개봉 120만원'],
+        '당근마켓': ['LG 오브제 냉장고 110만원'],
+        '중고나라': ['생활기스 있음 115만원'],
+        '다나와': ['LG 오브제 냉장고 새상품 130만원']
+      };
+
+      let html = `<h2>\"${query}\" 중고 평균 시세</h2>`;
+      html += `<p><strong>${avg.toLocaleString()}원</strong></p>`;
+      html += `<p>관련 키워드: ${tags.join(' ')}</p>`;
+
+      for (let site in siteData) {
+        html += `<div class='site-block'><strong>${site}</strong><ul>`;
+        siteData[site].forEach(item => {
+          html += `<li>${item}</li>`;
+        });
+        html += `</ul></div>`;
+      }
+
+      resultDiv.innerHTML = html;
+    }
+  </script>
+</body>
+</html>
