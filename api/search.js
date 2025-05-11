@@ -1,64 +1,65 @@
 // api/search.js
-
 export default async function handler(req, res) {
   const { q } = req.query;
-
   if (!q) {
-    return res
-      .status(400)
-      .json({ error: '검색어(q) 파라미터가 필요합니다.' });
+    return res.status(400).json({ error: '검색어(q) 파라미터가 필요합니다.' });
   }
 
-  // 1) Bunjang “개인 매물” 전용 API 엔드포인트로 교체
-  const keyword = encodeURIComponent(q);
+  const apiKey = process.env.SERPAPI_KEY;
   const apiUrl =
-    'https://api.bunjang.co.kr/api/1/find_v2.json' +
-    `?keyword=${keyword}` +
-    '&order=date' +
-    '&start=0' +
-    '&count=100';
+    `https://serpapi.com/search.json` +
+    `?q=${encodeURIComponent(q + ' 중고')}` +  // '중고' 자동 추가
+    `&hl=ko&gl=kr&api_key=${apiKey}`;
 
   try {
     const response = await fetch(apiUrl);
-    const bodyText = await response.text();
-
-    // 2) 에러 본문 로그 남기기
     if (!response.ok) {
-      console.error('🍊 Bunjang API error:', response.status, bodyText);
-      return res
-        .status(500)
-        .json({ error: `Bunjang API HTTP ${response.status}` });
+      const text = await response.text();
+      console.error('SerpAPI error:', response.status, text);
+      throw new Error(`SerpAPI HTTP ${response.status}`);
     }
+    const data = await response.json();
+    const results = data.organic_results || [];
 
-    const data = JSON.parse(bodyText);
-    const rawList = Array.isArray(data.list) ? data.list : [];
+    // 번개장터 개인 매물 링크만
+    const items = results
+      .filter(item => {
+        try {
+          const u = new URL(item.link);
+          return (
+            u.hostname.includes('bunjang.co.kr') &&
+            u.pathname.startsWith('/products/')
+          );
+        } catch {
+          return false;
+        }
+      })
+      .map(item => ({
+        title: item.title,
+        link: item.link,
+        snippet: item.snippet || ''
+      }));
 
-    // 3) 개인 매물만 필터(shop_member_no가 없는 것)
-    const personal = rawList.filter(item => !item.shop_member_no);
+    // 가격 파싱 & 평균 계산
+    const prices = items.reduce((arr, { title, snippet }) => {
+      const text = `${title} ${snippet}`;
+      const m = text.match(/([0-9,]+)\s*(만원|원)/);
+      if (m) {
+        let num = parseInt(m[1].replace(/,/g, ''), 10);
+        if (m[2] === '만원') num *= 10000;
+        arr.push(num);
+      }
+      return arr;
+    }, []);
 
-    // 4) title, price, link 구조로 정리
-    const items = personal.map(item => ({
-      title: item.title,
-      price: item.price,
-      link: `https://m.bunjang.co.kr/products/${item.product_id}`
-    }));
-
-    // 5) 평균 가격 계산
-    const prices = items
-      .map(i => i.price)
-      .filter(n => typeof n === 'number' && n > 0);
     const average =
       prices.length > 0
         ? Math.floor(prices.reduce((a, b) => a + b, 0) / prices.length)
         : null;
 
-    // 6) 최종 응답
     return res.status(200).json({ average, items });
-
   } catch (err) {
-    console.error('🍊 /api/search exception:', err);
-    return res
-      .status(500)
-      .json({ error: err.message || '서버 오류가 발생했습니다.' });
+    console.error('/api/search exception:', err);
+    return res.status(500).json({ error: err.message });
   }
 }
