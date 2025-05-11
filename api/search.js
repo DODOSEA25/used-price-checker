@@ -5,6 +5,7 @@ export default async function handler(req, res) {
   console.log('🔑 SERPAPI_KEY:', process.env.SERPAPI_KEY ? '✅ 설정됨' : '❌ 없음');
 
   if (!q) {
+    console.log('⚠️ query 파라미터가 없어요');
     res.status(400).json({ error: "query 파라미터가 필요합니다." });
     return;
   }
