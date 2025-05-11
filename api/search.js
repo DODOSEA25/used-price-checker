@@ -8,13 +8,15 @@ export default async function handler(req, res) {
 
   if (!q) {
     console.log('⚠️ query 파라미터가 없음');
-    res.status(400).json({ error: 'query 파라미터가 필요합니다.' });
-    return;
+    return res.status(400).json({ error: 'query 파라미터가 필요합니다.' });
   }
 
-  // 2) 여기서 apiKey 선언
+  // ─── 여기가 핵심: apiKey 선언 ───
   const apiKey = process.env.SERPAPI_KEY;
-  const apiUrl = `https://serpapi.com/search.json?q=${encodeURIComponent(q)}&hl=ko&gl=kr&api_key=${apiKey}`;
+  const apiUrl = `https://serpapi.com/search.json`
+    + `?q=${encodeURIComponent(q)}`
+    + `&hl=ko&gl=kr`
+    + `&api_key=${apiKey}`;
   console.log('🌐 calling SerpAPI:', apiUrl);
 
   try {
@@ -29,10 +31,10 @@ export default async function handler(req, res) {
 
     const data = await response.json();
     console.log('✅ SerpAPI data keys:', Object.keys(data));
-    res.status(200).json(data);
+    return res.status(200).json(data);
 
   } catch (err) {
     console.error('🔥 handler error:', err);
-    res.status(500).json({ error: err.message });
+    return res.status(500).json({ error: err.message });
   }
 }
