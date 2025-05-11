@@ -27,11 +27,8 @@
       margin-left: auto;
       margin-right: auto;
     }
-    .site-block {
-      border: 1px solid #ccc;
-      padding: 1em;
-      margin-top: 1em;
-      border-radius: 5px;
+    .result ul {
+      padding-left: 1em;
     }
   </style>
 </head>
@@ -44,7 +41,7 @@
   <div id="result" class="result"></div>
 
   <script>
-    function searchPrice() {
+    async function searchPrice() {
       const query = document.getElementById('searchInput').value;
       const resultDiv = document.getElementById('result');
 
@@ -53,31 +50,56 @@
         return;
       }
 
-      // 실제로는 서버에서 크롤링해야 하지만, 일단 더미 데이터로 대체
-      const dummyPrices = [990000, 1200000, 1150000, 1100000];
-      const avg = Math.floor(dummyPrices.reduce((a, b) => a + b, 0) / dummyPrices.length);
+      resultDiv.innerHTML = '<p>검색 중...</p>';
 
-      const tags = ['#1년사용', '#생활기스', '#미개봉'];
-      const siteData = {
-        '번개장터': ['LG 오브제 냉장고 99만원', '미개봉 120만원'],
-        '당근마켓': ['LG 오브제 냉장고 110만원'],
-        '중고나라': ['생활기스 있음 115만원'],
-        '다나와': ['LG 오브제 냉장고 새상품 130만원']
-      };
+      // 🔑 여기에 너의 SerpAPI 키를 넣어줘
+      const apiKey = ca802ad3c8d5c4df88fb0b89f1192f9685537fd3f3d0ce4a82768c19d6613747;
 
-      let html = `<h2>\"${query}\" 중고 평균 시세</h2>`;
-      html += `<p><strong>${avg.toLocaleString()}원</strong></p>`;
-      html += `<p>관련 키워드: ${tags.join(' ')}</p>`;
+      const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query + " site:bunjang.co.kr")}&hl=ko&gl=kr&api_key=${apiKey}`;
 
-      for (let site in siteData) {
-        html += `<div class='site-block'><strong>${site}</strong><ul>`;
-        siteData[site].forEach(item => {
-          html += `<li>${item}</li>`;
+      try {
+        const response = await fetch(url);
+        const data = await response.json();
+
+        const items = data.organic_results || [];
+        if (items.length === 0) {
+          resultDiv.innerHTML = '<p>검색 결과가 없습니다.</p>';
+          return;
+        }
+
+        let prices = [];
+        let html = `<h2>"${query}" 중고 시세 결과</h2><ul>`;
+
+        items.slice(0, 5).forEach(item => {
+          const title = item.title;
+          const link = item.link;
+
+          // 📦 가격 패턴 추출: "99만", "120만원", "150,000원" 등
+          const match = title.match(/([0-9,]+)[\\s]*?(만원|원)/);
+          if (match) {
+            let raw = match[1].replace(/,/g, '');
+            let num = parseInt(raw);
+            if (match[2] === '만원') num *= 10000;
+            prices.push(num);
+          }
+
+          html += `<li><a href="${link}" target="_blank">${title}</a></li>`;
         });
-        html += `</ul></div>`;
-      }
 
-      resultDiv.innerHTML = html;
+        html += `</ul>`;
+
+        if (prices.length > 0) {
+          const avg = Math.floor(prices.reduce((a, b) => a + b) / prices.length);
+          html = `<p><strong>평균 시세: ${avg.toLocaleString()}원</strong></p>` + html;
+        } else {
+          html = "<p>가격 정보가 포함된 결과가 부족합니다.</p>" + html;
+        }
+
+        resultDiv.innerHTML = html;
+
+      } catch (error) {
+        resultDiv.innerHTML = `<p>오류 발생: ${error.message}</p>`;
+      }
     }
   </script>
 </body>
