@@ -24,8 +24,7 @@
       margin-top: 2em;
       text-align: left;
       max-width: 600px;
-      margin-left: auto;
-      margin-right: auto;
+      margin: 0 auto;
     }
     .result ul {
       padding-left: 1em;
@@ -42,22 +41,22 @@
 
   <script>
     async function searchPrice() {
-      const query = document.getElementById('searchInput').value;
+      const query = document.getElementById('searchInput').value.trim();
       const resultDiv = document.getElementById('result');
 
-      if (!query.trim()) {
+      if (!query) {
         resultDiv.innerHTML = '<p>검색어를 입력해주세요.</p>';
         return;
       }
 
       resultDiv.innerHTML = '<p>검색 중...</p>';
 
-      const apiKey = "ca802ad3c8d5c4df88fb0b89f1192f9685537fd3f3d0ce4a82768c19d6613747";
-
-      const url = `https://serpapi.com/search.json?q=${encodeURIComponent(query + " site:bunjang.co.kr")}&hl=ko&gl=kr&api_key=${apiKey}`;
+      // 이제 클라이언트는 내부 API만 호출합니다.
+      const url = `/api/search?q=${encodeURIComponent(query)}`;
 
       try {
         const response = await fetch(url);
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
 
         const items = data.organic_results || [];
@@ -73,11 +72,10 @@
           const title = item.title;
           const link = item.link;
 
-          // 📦 가격 패턴 추출: "99만", "120만원", "150,000원" 등
-          const match = title.match(/([0-9,]+)[\\s]*?(만원|원)/);
+          const match = title.match(/([0-9,]+)\s*(만원|원)/);
           if (match) {
             let raw = match[1].replace(/,/g, '');
-            let num = parseInt(raw);
+            let num = parseInt(raw, 10);
             if (match[2] === '만원') num *= 10000;
             prices.push(num);
           }
@@ -85,13 +83,13 @@
           html += `<li><a href="${link}" target="_blank">${title}</a></li>`;
         });
 
-        html += `</ul>`;
+        html += '</ul>';
 
         if (prices.length > 0) {
           const avg = Math.floor(prices.reduce((a, b) => a + b) / prices.length);
           html = `<p><strong>평균 시세: ${avg.toLocaleString()}원</strong></p>` + html;
         } else {
-          html = "<p>가격 정보가 포함된 결과가 부족합니다.</p>" + html;
+          html = '<p>가격 정보가 포함된 결과가 부족합니다.</p>' + html;
         }
 
         resultDiv.innerHTML = html;
