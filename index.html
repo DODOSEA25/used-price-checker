@@ -1,76 +1,107 @@
 <!DOCTYPE html>
 <html lang="ko">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"> 
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>중고 시세 검색기</title>
   <style>
-    body { font-family: Arial, sans-serif; text-align: center; padding: 2em; }
-    input { padding: 10px; width: 320px; font-size: 16px; }
-    button { padding: 10px 20px; font-size: 16px; margin-left: 5px; }
-    .result { margin-top: 2em; text-align: left; max-width: 600px; margin: 0 auto; }
-    .result ul { padding-left: 1em; }
+    body {
+      font-family: 'Arial', sans-serif;
+      text-align: center;
+      padding: 2em;
+    }
+    input[type="text"] {
+      padding: 10px;
+      width: 320px;
+      font-size: 16px;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 16px;
+      margin-left: 5px;
+    }
+    .result {
+      margin-top: 2em;
+      text-align: left;
+      max-width: 600px;
+      margin: 0 auto;
+    }
+    .result ul {
+      padding-left: 1em;
+    }
   </style>
 </head>
 <body>
   <h1>중고 시세 검색기</h1>
   <p>내가 팔거나 사고 싶은 제품의 중고 시세가 얼마일까?</p>
 
-  <!-- 자동완성용 datalist 연결 -->
-  <input id="searchInput" list="suggestions" placeholder="예: 다이슨 V8 청소기" oninput="onInput()" />
+  <!-- 자동완성 입력창 -->
+  <input
+    id="searchInput"
+    list="suggestions"
+    placeholder="예: 다이슨 V8 청소기"
+    oninput="onInput()" />
   <datalist id="suggestions"></datalist>
   <button onclick="searchPrice()">검색</button>
 
   <div id="result" class="result"></div>
 
   <script>
-    // 중고 검색 함수
+    const ALLOWED_HOSTS = [
+      "bunjang.co.kr",
+      "joongna.com",
+      "daangn.com",
+      "cafe.naver.com"
+    ];
+
     async function searchPrice() {
       const userInput = document.getElementById('searchInput').value.trim();
+      const resultDiv = document.getElementById('result');
       if (!userInput) {
-        return document.getElementById('result').innerHTML = '<p>검색어를 입력해주세요.</p>';
+        resultDiv.innerHTML = '<p>검색어를 입력해주세요.</p>';
+        return;
       }
 
-      const display = userInput;
+      // 내부 검색어에 '중고' 자동 추가
       const query = `${userInput} 중고`;
-      document.getElementById('result').innerHTML = '<p>검색 중...</p>';
+      resultDiv.innerHTML = '<p>검색 중...</p>';
 
       try {
         const resp = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
-        if (!resp.ok) throw new Error(resp.status);
+        if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
         const data = await resp.json();
 
         const items = data.organic_results || [];
-        if (!items.length) {
-          return document.getElementById('result').innerHTML = '<p>검색 결과가 없습니다.</p>';
-        }
-
         // 플랫폼 필터 + 렌탈 제외
-        const hosts = ["bunjang.co.kr","joongna.com","daangn.com","cafe.naver.com"];
         const filtered = items.filter(i => {
-          const txt = (i.title + " " + (i.snippet||"")).toLowerCase();
-          if (/(렌탈|대여|임대)/.test(txt)) return false;
-          try { return hosts.some(h=>new URL(i.link).hostname.includes(h)); }
-          catch { return false; }
+          const text = (i.title + " " + (i.snippet||"")).toLowerCase();
+          if (/(렌탈|대여|임대)/.test(text)) return false;
+          try {
+            return ALLOWED_HOSTS.some(h=>new URL(i.link).hostname.includes(h));
+          } catch {
+            return false;
+          }
         });
+
         if (!filtered.length) {
-          return document.getElementById('result').innerHTML = '<p>허용된 중고거래 사이트 결과가 없습니다.</p>';
+          resultDiv.innerHTML = '<p>허용된 중고거래 사이트 결과가 없습니다.</p>';
+          return;
         }
 
-        // 최대 10개, 가격 뽑기
-        const slice = filtered.slice(0,10);
-        let prices = [], html = `<h2>"${display}" 중고 시세 결과</h2><ul>`;
-        slice.forEach(item=>{
+        // 최대 10개, 가격 파싱
+        const slice = filtered.slice(0, 10);
+        let prices = [], html = `<h2>"${userInput}" 중고 시세 결과</h2><ul>`;
+        slice.forEach(item => {
           const text = `${item.title} ${item.snippet||""}`;
           const m = text.match(/([0-9,]+)\s*(만원|원)/);
           if (m) {
-            let n = parseInt(m[1].replace(/,/g,''),10);
-            if (m[2]==="만원") n*=10000;
-            prices.push(n);
+            let num = parseInt(m[1].replace(/,/g,''),10);
+            if (m[2] === "만원") num *= 10000;
+            prices.push(num);
           }
           html += `<li><a href="${item.link}" target="_blank">${item.title}</a></li>`;
         });
-        html += `</ul>`;
+        html += '</ul>';
 
         if (prices.length) {
           const avg = Math.floor(prices.reduce((a,b)=>a+b)/prices.length);
@@ -78,26 +109,31 @@
         } else {
           html = '<p>가격 정보를 찾을 수 없는 결과입니다.</p>' + html;
         }
-        document.getElementById('result').innerHTML = html;
-      } catch(e) {
+
+        resultDiv.innerHTML = html;
+      } catch (e) {
         document.getElementById('result').innerHTML = `<p>오류 발생: ${e.message}</p>`;
       }
     }
 
     // 자동완성 입력 이벤트
     let acTimeout;
-    function onInput() {
+    async function onInput() {
       clearTimeout(acTimeout);
       const v = document.getElementById('searchInput').value.trim();
-      if (!v) return;
-      acTimeout = setTimeout(async ()=>{
+      const list = document.getElementById('suggestions');
+      list.innerHTML = '';           // 항상 먼저 비우기
+      if (!v) return;               // 빈 값이면 더 이상 처리하지 않음
+
+      acTimeout = setTimeout(async () => {
         try {
           const resp = await fetch(`/api/autocomplete?term=${encodeURIComponent(v)}`);
           if (!resp.ok) throw new Error(resp.status);
           const { suggestions } = await resp.json();
-          const list = document.getElementById('suggestions');
-          list.innerHTML = '';
-          suggestions.forEach(text=>{
+          suggestions.forEach(item => {
+            // item이 객체면 value 속성, 아니면 문자열 그대로
+            const text = typeof item === 'string' ? item : (item.value || "");
+            if (!text) return;
             const opt = document.createElement('option');
             opt.value = text;
             list.appendChild(opt);
