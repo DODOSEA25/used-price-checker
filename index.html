@@ -40,7 +40,7 @@
   <div id="result" class="result"></div>
 
   <script>
-    // 허용할 중고거래 사이트 도메인 리스트 (부분 일치)
+    // 허용할 중고거래 사이트 도메인 (부분 일치)
     const ALLOWED_HOSTS = [
       "bunjang.co.kr",
       "joongna.com",
@@ -49,17 +49,22 @@
     ];
 
     async function searchPrice() {
-      const query = document.getElementById('searchInput').value.trim();
+      const userInput = document.getElementById('searchInput').value.trim();
       const resultDiv = document.getElementById('result');
 
-      if (!query) {
+      if (!userInput) {
         resultDiv.innerHTML = '<p>검색어를 입력해주세요.</p>';
         return;
       }
+
+      // 화면엔 순수 키워드, 내부 요청엔 '중고' 자동 추가
+      const displayKeyword = userInput;
+      const internalQuery = `${userInput} 중고`;
+
       resultDiv.innerHTML = '<p>검색 중...</p>';
 
       try {
-        const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+        const response = await fetch(`/api/search?q=${encodeURIComponent(internalQuery)}`);
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const data = await response.json();
 
@@ -69,10 +74,10 @@
           return;
         }
 
-        // 1) 허용 도메인 필터 + "렌탈/대여/임대" 제외
+        // 도메인 필터 + '렌탈/대여/임대' 제외
         const filtered = items.filter(item => {
-          const txt = (item.title + " " + (item.snippet||"")).toLowerCase();
-          if (/(렌탈|대여|임대)/.test(txt)) return false;
+          const text = (item.title + " " + (item.snippet||"")).toLowerCase();
+          if (/(렌탈|대여|임대)/.test(text)) return false;
           try {
             const host = new URL(item.link).hostname;
             return ALLOWED_HOSTS.some(allowed => host.includes(allowed));
@@ -86,35 +91,30 @@
           return;
         }
 
-        // 2) 최대 10개까지 표시
+        // 최대 10개 표시
         const slice = filtered.slice(0, 10);
 
-        // 3) 가격 파싱 및 HTML 구성
+        // 가격 파싱 & 결과 렌더링
         let prices = [];
-        let html = `<h2>"${query}" 중고 시세 결과</h2><ul>`;
+        let html = `<h2>"${displayKeyword}" 중고 시세 결과</h2><ul>`;
 
         slice.forEach(item => {
           const title = item.title;
           const snippet = item.snippet || "";
           const link = item.link;
-
-          const text = `${title} ${snippet}`;
-          const m = text.match(/([0-9,]+)\s*(만원|원)/);
-          if (m) {
-            let raw = m[1].replace(/,/g, '');
+          const combined = `${title} ${snippet}`;
+          const match = combined.match(/([0-9,]+)\s*(만원|원)/);
+          if (match) {
+            let raw = match[1].replace(/,/g, '');
             let num = parseInt(raw, 10);
-            if (m[2] === "만원") num *= 10000;
+            if (match[2] === "만원") num *= 10000;
             prices.push(num);
           }
-
-          html += `<li>
-            <a href="${link}" target="_blank">${title}</a>
-          </li>`;
+          html += `<li><a href="${link}" target="_blank">${title}</a></li>`;
         });
 
         html += `</ul>`;
 
-        // 4) 평균 시세 표시
         if (prices.length) {
           const avg = Math.floor(prices.reduce((a,b)=>a+b)/prices.length);
           html = `<p><strong>평균 시세: ${avg.toLocaleString()}원 (총 ${prices.length}건)</strong></p>` + html;
