@@ -51,7 +51,6 @@
 
       resultDiv.innerHTML = '<p>검색 중...</p>';
 
-      // 이제 클라이언트는 내부 API만 호출합니다.
       const url = `/api/search?q=${encodeURIComponent(query)}`;
 
       try {
@@ -85,7 +84,7 @@
 
         html += '</ul>';
 
-        if (prices.length > 0) {
+        if (prices.length) {
           const avg = Math.floor(prices.reduce((a, b) => a + b) / prices.length);
           html = `<p><strong>평균 시세: ${avg.toLocaleString()}원</strong></p>` + html;
         } else {
@@ -93,7 +92,6 @@
         }
 
         resultDiv.innerHTML = html;
-
       } catch (error) {
         resultDiv.innerHTML = `<p>오류 발생: ${error.message}</p>`;
       }
