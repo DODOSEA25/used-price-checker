@@ -10,7 +10,7 @@ export default async function handler(req, res) {
     return;
   }
 
-  const apiUrl = `https://serpapi.com/search.json?q=${encodeURIComponent(q + " site:bunjang.co.kr")}&hl=ko&gl=kr&api_key=${process.env.SERPAPI_KEY}`;
+  const apiUrl = `https://serpapi.com/search.json?q=${encodeURIComponent(q)}&hl=ko&gl=kr&api_key=${apiKey}`;
   console.log('🌐 calling SerpAPI:', apiUrl);
 
   try {
